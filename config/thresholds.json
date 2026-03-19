@@ -1,0 +1,7 @@
+{
+  "revenue_drop_pct": 20,
+  "conversion_min_pct": 15,
+  "upsells_drop_pct": 25,
+  "plan_behind_pct": 15,
+  "lookback_days": 7
+}
