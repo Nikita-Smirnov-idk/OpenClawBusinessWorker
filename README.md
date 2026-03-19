@@ -206,6 +206,10 @@ openclaw cron add \
   --cron "0 9 * * *" \
   --tz "Europe/Moscow" \
   --session isolated \
+  --announce \
   --message "Запусти alerts_checker.py. Если есть алерты — сформируй бизнес-выводы. Если нет — напиши что всё в норме." \
-  --announce --channel telegram
+  --channel telegram \
+  --to "<chat id>"
 ```
+
+Chat id можно спросить у самого бота и ввести только цифры
