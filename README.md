@@ -94,33 +94,42 @@ ID таблицы — это часть URL: `https://docs.google.com/spreadshee
 
 ### 6. Подключите workspace к OpenClaw
 
-Добавьте агента `business` в `.openclaw/openclaw.json`, например если нужен только агент `business`:
+Добавьте агента `business` в openclaw:
 
-```json5
-{
-  "agents": {
-    "list": [
-      {
-        "id": "business",
-        "workspace": "/полный/путь/к/OpenClawBusinessWorker",
-        "model": {
-          "primary": "openai-codex/gpt-5.4"
-        }
-      }
-    ]
-  },
-  "channels": {
-    "telegram": {
-      "enabled": true,
-      "botToken": "${TELEGRAM_BOT_TOKEN}",
-      "dmPolicy": "pairing"
-    }
-  },
-  "cron": {
-    "enabled": true
-  }
-}
+```bash
+openclaw agents add business
 ```
+Далее настройте агента под себя.
+Выберите репозиторий куда вы склонировали проект
+
+Далее можете отвечать так:
+
+Copy auth profiles from "main"?
+|  No
+
+Configure model/auth for this agent now?
+|  No
+
+Configure chat channels now?
+|  Yes
+
+Select a channel
+|  Telegram (Bot API)
+
+Telegram account
+│  default (primary)
+
+How do you want to provide this Telegram bot token?
+│  Enter Telegram bot token
+
+Enter Telegram bot token
+│  Ваш токен
+
+Configure DM access policies now? (default: pairing)
+│  No
+
+Route selected channels to this agent now? (bindings)
+│  Yes
 
 ### 7. Запустите gateway
 
