@@ -5,13 +5,17 @@ import json
 import sys
 from datetime import datetime, timedelta
 
+from logging_utils import get_logger
 from sheets_reader import fetch_all, fetch_range, parse_date
+
+logger = get_logger("analytics")
 
 
 def calc_conversion(days=7):
     """Расчёт конверсии за N дней."""
     rows = fetch_range(days)
     if not rows:
+        logger.warning("No rows for conversion, days=%d", days)
         return {"status": "ok", "message": f"Нет данных за последние {days} дней"}
 
     total_leads = sum(r["leads"] for r in rows)
@@ -30,6 +34,14 @@ def calc_conversion(days=7):
         prev_sales = sum(r["sales"] for r in prev_rows)
         prev_conversion = (prev_sales / prev_leads * 100) if prev_leads > 0 else 0
 
+    logger.info(
+        "Conversion calculated: days=%d leads=%.0f sales=%.0f current=%.1f prev=%s",
+        days,
+        total_leads,
+        total_sales,
+        conversion,
+        f"{prev_conversion:.1f}" if prev_conversion is not None else "None",
+    )
     return {
         "status": "ok",
         "days": days,
@@ -45,6 +57,7 @@ def calc_upsells(days=7):
     """Расчёт допродаж за N дней."""
     rows = fetch_range(days)
     if not rows:
+        logger.warning("No rows for upsells, days=%d", days)
         return {"status": "ok", "message": f"Нет данных за последние {days} дней"}
 
     total_upsells = sum(r["upsells"] for r in rows)
@@ -64,6 +77,13 @@ def calc_upsells(days=7):
     if prev_total is not None and prev_total > 0:
         change_pct = round((total_upsells - prev_total) / prev_total * 100, 1)
 
+    logger.info(
+        "Upsells calculated: days=%d total=%.0f avg_daily=%.1f prev_total=%s",
+        days,
+        total_upsells,
+        avg_daily,
+        f"{prev_total:.0f}" if prev_total is not None else "None",
+    )
     return {
         "status": "ok",
         "days": days,
@@ -79,6 +99,7 @@ def calc_forecast(days=3):
     lookback = 14
     rows = fetch_range(lookback)
     if len(rows) < 3:
+        logger.warning("Not enough data for forecast: rows=%d needed=3", len(rows))
         return {"status": "ok", "message": "Недостаточно данных для прогноза (нужно минимум 3 дня)"}
 
     revenues = [r["revenue"] for r in rows]
@@ -115,6 +136,13 @@ def calc_forecast(days=3):
     current_month_revenue = sum(r["revenue"] for r in rows if parse_date(r["date"]).month == today.month)
     projected_month = current_month_revenue + total_forecast + avg_recent * max(0, days_left - days)
 
+    logger.info(
+        "Forecast calculated: forecast_days=%d based_on=%d total_forecast=%.0f trend=%.2f",
+        days,
+        n,
+        total_forecast,
+        b,
+    )
     return {
         "status": "ok",
         "forecast_days": days,
@@ -133,6 +161,7 @@ def calc_summary():
     """Общая сводка по метрикам за последние 7 дней."""
     rows = fetch_range(7)
     if not rows:
+        logger.warning("No rows for summary")
         return {"status": "ok", "message": "Нет данных за последние 7 дней"}
 
     total_revenue = sum(r["revenue"] for r in rows)
@@ -155,6 +184,13 @@ def calc_summary():
     date_from = min(dates).strftime("%d.%m") if dates else "?"
     date_to = max(dates).strftime("%d.%m.%Y") if dates else "?"
 
+    logger.info(
+        "Summary calculated: revenue=%.0f sales=%.0f leads=%.0f plan_pct=%.1f",
+        total_revenue,
+        total_sales,
+        total_leads,
+        plan_pct,
+    )
     return {
         "status": "ok",
         "period": f"{date_from} – {date_to}",
@@ -182,6 +218,8 @@ def main():
         if idx + 1 < len(sys.argv):
             days = int(sys.argv[idx + 1])
 
+    logger.info("Running analytics command=%s days=%d", command, days)
+
     try:
         if command == "conversion":
             result = calc_conversion(days)
@@ -197,6 +235,8 @@ def main():
         print(json.dumps(result, ensure_ascii=False))
 
     except Exception as e:
+        logger.error("analytics failed for command=%s days=%d: %s", command, days, e)
+        logger.debug("analytics traceback", exc_info=True)
         print(json.dumps({"status": "error", "message": str(e)}, ensure_ascii=False))
         sys.exit(1)
 

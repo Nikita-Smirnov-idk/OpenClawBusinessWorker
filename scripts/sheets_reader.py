@@ -11,9 +11,12 @@ import gspread
 from google.oauth2.service_account import Credentials
 from dotenv import load_dotenv
 
+from logging_utils import get_logger
+
 # Загружаем .env относительно корня проекта
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 load_dotenv(PROJECT_ROOT / ".env")
+logger = get_logger("sheets_reader")
 
 SCOPES = [
     "https://www.googleapis.com/auth/spreadsheets.readonly",
@@ -34,6 +37,7 @@ COLUMN_MAP = {
 
 def get_client():
     creds_path = PROJECT_ROOT / os.getenv("GOOGLE_SHEETS_CREDENTIALS_PATH", "credentials/service_account.json")
+    logger.debug("Initializing Google Sheets client with credentials path: %s", creds_path)
     creds = Credentials.from_service_account_file(str(creds_path), scopes=SCOPES)
     return gspread.authorize(creds)
 
@@ -42,6 +46,7 @@ def get_worksheet():
     client = get_client()
     spreadsheet_id = os.getenv("GOOGLE_SHEETS_SPREADSHEET_ID")
     worksheet_name = os.getenv("GOOGLE_SHEETS_WORKSHEET_NAME", "Лист1")
+    logger.debug("Opening spreadsheet by key for worksheet: %s", worksheet_name)
     spreadsheet = client.open_by_key(spreadsheet_id)
     return spreadsheet.worksheet(worksheet_name)
 
@@ -82,9 +87,11 @@ def row_to_dict(headers, row):
 
 def fetch_all():
     """Загружает все данные из таблицы."""
+    logger.info("Fetching all rows from Google Sheets")
     ws = get_worksheet()
     records = ws.get_all_values()
     if len(records) < 2:
+        logger.warning("Spreadsheet has no data rows")
         return []
     headers = records[0]
     rows = []
@@ -92,6 +99,7 @@ def fetch_all():
         if not row or not row[0].strip():
             continue
         rows.append(row_to_dict(headers, row))
+    logger.info("Fetched %d rows", len(rows))
     return rows
 
 
@@ -101,7 +109,9 @@ def fetch_today():
     rows = fetch_all()
     for r in rows:
         if parse_date(r.get("date", "")) == today:
+            logger.info("Found row for today: %s", today.isoformat())
             return r
+    logger.info("No row found for today: %s", today.isoformat())
     return None
 
 
@@ -110,7 +120,9 @@ def fetch_range(days):
     end = datetime.now().date()
     start = end - timedelta(days=days - 1)
     rows = fetch_all()
-    return [r for r in rows if parse_date(r.get("date", "")) and start <= parse_date(r["date"]) <= end]
+    filtered = [r for r in rows if parse_date(r.get("date", "")) and start <= parse_date(r["date"]) <= end]
+    logger.info("Filtered %d rows for range %s..%s", len(filtered), start.isoformat(), end.isoformat())
+    return filtered
 
 
 def main():
@@ -119,6 +131,7 @@ def main():
         sys.exit(1)
 
     command = sys.argv[1].lower()
+    logger.info("Running command: %s", command)
 
     try:
         if command == "today":
@@ -142,6 +155,8 @@ def main():
             sys.exit(1)
 
     except Exception as e:
+        logger.error("sheets_reader failed for command=%s: %s", command, e)
+        logger.debug("sheets_reader traceback", exc_info=True)
         print(json.dumps({"status": "error", "message": str(e)}, ensure_ascii=False))
         sys.exit(1)
 

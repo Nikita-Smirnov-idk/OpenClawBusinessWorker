@@ -81,6 +81,7 @@ GOOGLE_SHEETS_CREDENTIALS_PATH=credentials/service_account.json
 GOOGLE_SHEETS_SPREADSHEET_ID=<ID таблицы из URL>
 GOOGLE_SHEETS_WORKSHEET_NAME=Лист1
 TELEGRAM_BOT_TOKEN=<токен от @BotFather>
+BUSINESS_WORKER_LOG_LEVEL=INFO
 ```
 
 ID таблицы — это часть URL: `https://docs.google.com/spreadsheets/d/<ВОТ_ЭТОТ_ID>/edit`
@@ -93,7 +94,7 @@ ID таблицы — это часть URL: `https://docs.google.com/spreadshee
 
 ### 6. Подключите workspace к OpenClaw
 
-Добавьте агента `business` в `.openclaw/openclaw.json`:
+Добавьте агента `business` в `.openclaw/openclaw.json`, например если нужен только агент `business`:
 
 ```json5
 {
@@ -157,6 +158,13 @@ python3 scripts/alerts_checker.py
 ```
 
 Все скрипты возвращают JSON с полем `"status": "ok"` или `"status": "error"`.
+Логи пишутся в `stderr` (не ломают JSON в `stdout`).
+
+## Логирование
+
+- Все Python-скрипты используют стандартный `logging`.
+- Уровень логов задаётся через `BUSINESS_WORKER_LOG_LEVEL` (`DEBUG`, `INFO`, `WARNING`, `ERROR`).
+- Формат логов можно переопределить через `BUSINESS_WORKER_LOG_FORMAT`.
 
 ## Команды Telegram-бота
 

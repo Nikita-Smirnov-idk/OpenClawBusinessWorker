@@ -10,8 +10,11 @@ import gspread
 from google.oauth2.service_account import Credentials
 from dotenv import load_dotenv
 
+from logging_utils import get_logger
+
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 load_dotenv(PROJECT_ROOT / ".env")
+logger = get_logger("seed_data")
 
 SCOPES = [
     "https://www.googleapis.com/auth/spreadsheets",
@@ -20,6 +23,7 @@ SCOPES = [
 
 
 def main():
+    logger.info("Seeding test data to Google Sheets")
     creds_path = PROJECT_ROOT / os.getenv("GOOGLE_SHEETS_CREDENTIALS_PATH", "credentials/service_account.json")
     creds = Credentials.from_service_account_file(str(creds_path), scopes=SCOPES)
     client = gspread.authorize(creds)
@@ -58,8 +62,14 @@ def main():
 
     ws.clear()
     ws.update(values=rows, range_name=f"A1:H{len(rows)}")
+    logger.info("Seed data uploaded: rows=%d worksheet=%s", len(rows) - 1, worksheet_name)
     print(f"Записано {len(rows) - 1} строк с данными за {rows[1][0]} – {rows[-1][0]}")
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except Exception as e:
+        logger.error("seed_data failed: %s", e)
+        logger.debug("seed_data traceback", exc_info=True)
+        raise

@@ -6,14 +6,17 @@ import sys
 from datetime import datetime, timedelta
 from pathlib import Path
 
+from logging_utils import get_logger
 from sheets_reader import fetch_all, fetch_range, parse_date
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
+logger = get_logger("alerts_checker")
 
 
 def load_thresholds():
     """Загружает пороги из config/thresholds.json."""
     path = PROJECT_ROOT / "config" / "thresholds.json"
+    logger.debug("Loading thresholds from %s", path)
     with open(path, "r") as f:
         return json.load(f)
 
@@ -24,8 +27,10 @@ def check_alerts():
     lookback = thresholds.get("lookback_days", 7)
     rows = fetch_range(lookback)
     alerts = []
+    logger.info("Checking alerts for lookback_days=%d rows=%d", lookback, len(rows))
 
     if not rows:
+        logger.warning("No data rows for alerts check")
         return {"status": "ok", "alerts": [], "message": "Нет данных для проверки"}
 
     # Данные за сегодня (последняя запись)
@@ -38,6 +43,7 @@ def check_alerts():
 
     if today_row is None and rows:
         today_row = rows[-1]
+        logger.info("No row for current date, using latest row instead")
 
     # Средние за период (исключая сегодня)
     hist_rows = [r for r in rows if r != today_row] if today_row else rows
@@ -58,6 +64,7 @@ def check_alerts():
                 "average": round(avg_revenue),
                 "change_pct": round(revenue_change, 1),
             })
+            logger.warning("Revenue drop alert triggered: change_pct=%.1f threshold=%s", revenue_change, -threshold)
 
     # 2. Конверсия ниже порога
     if today_row:
@@ -73,6 +80,7 @@ def check_alerts():
                 "threshold": conv_min,
                 "average": round(avg_conv, 1),
             })
+            logger.warning("Conversion alert triggered: current=%.1f threshold=%.1f", today_conv, conv_min)
 
     # 3. Падение допродаж
     avg_upsells = sum(r["upsells"] for r in hist_rows) / len(hist_rows) if hist_rows else 0
@@ -88,6 +96,7 @@ def check_alerts():
                 "average": round(avg_upsells, 1),
                 "change_pct": round(upsells_change, 1),
             })
+            logger.warning("Upsells alert triggered: change_pct=%.1f threshold=%s", upsells_change, -threshold)
 
     # 4. Отставание от плана
     plan = today_row.get("plan", 0) if today_row else 0
@@ -113,7 +122,9 @@ def check_alerts():
                 "expected_pct": round(expected_pct, 1),
                 "behind_pct": round(behind, 1),
             })
+            logger.warning("Plan-behind alert triggered: behind_pct=%.1f threshold=%.1f", behind, threshold)
 
+    logger.info("Alerts check complete: alerts_count=%d", len(alerts))
     return {
         "status": "ok",
         "alerts_count": len(alerts),
@@ -124,9 +135,12 @@ def check_alerts():
 
 def main():
     try:
+        logger.info("Running alerts checker")
         result = check_alerts()
         print(json.dumps(result, ensure_ascii=False))
     except Exception as e:
+        logger.error("alerts_checker failed: %s", e)
+        logger.debug("alerts_checker traceback", exc_info=True)
         print(json.dumps({"status": "error", "message": str(e)}, ensure_ascii=False))
         sys.exit(1)
 
